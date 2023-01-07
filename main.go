@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -13,6 +14,9 @@ var (
 )
 
 func main() {
+	fmt.Println("Starting server")
+
+	// Create a map to hold the known hosts
 	hosts = make(map[string]net.Conn)
 
 	// Listen for incoming connections
@@ -47,6 +51,7 @@ func handleConnection(conn net.Conn) {
 
 	// Add the host to the list of known hosts
 	hosts[hostname] = conn
+	fmt.Println("Added host", hostname)
 
 	// Create a buffer to hold incoming data
 	buf := make([]byte, 1024)
@@ -65,7 +70,7 @@ func handleConnection(conn net.Conn) {
 
 		// Check for special commands
 		data := strings.TrimSpace(string(buf[:n]))
-		if data == "list hosts" {
+		if data == "list" {
 			// Send a list of known hosts
 			hostList := "Known hosts:\n"
 			for h := range hosts {
@@ -80,6 +85,7 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("Error: Unknown host.\n"))
 				continue
 			}
+			fmt.Println("Connecting", hostname, "to", otherHost)
 
 			// Copy data between the two connections
 			go func() {
@@ -89,19 +95,19 @@ func handleConnection(conn net.Conn) {
 				}
 				conn.Close()
 				otherConn.Close()
-		
-				}()
-				go func() {
-					_, err := io.Copy(otherConn, conn)
-					if err != nil {
-						log.Println(err)
-					}
-					conn.Close()
-					otherConn.Close()
-				}()
-			} else {
-				// Send an error message
-				conn.Write([]byte("Error: Unknown command.\n"))
-			}
+			}()
+			go func() {
+				_, err := io.Copy(otherConn, conn)
+				if err != nil {
+					log.Println(err)
+				}
+				conn.Close()
+				otherConn.Close()
+			}()
+		} else {
+			// Send an error message
+			conn.Write([]byte("Error: Unknown command.\n"))
 		}
 	}
+}
+				
