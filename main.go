@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
-    "net/http"
+	"net"
+	"net/http"
 	"strings"
-	"encoding/json"
 )
 
 var (
@@ -20,28 +22,37 @@ func main() {
 	// Create a map to hold the known hosts
 	hosts = make(map[string]net.Conn)
 
-	// Listen for incoming connections
-	ln, err := net.Listen("tcp", ":8080")
+	// Register the HTTP handler
+	http.HandleFunc("/add-host", handleAddHost)
+
+	// Start the HTTP server
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func handleAddHost(w http.ResponseWriter, r *http.Request) {
+	// Read the request body
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
 	}
-	defer ln.Close()
 
-	// Accept incoming connections
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		// Handle the connection in a new goroutine
-		go handleConnection(conn)
+	// Decode the request body as JSON
+	var request struct {
+		Hostname string `json:"hostname"`
 	}
+	err = json.Unmarshal(body, &request)
+	if err != nil {
+		http.Error(w, "Error decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	// Add the host to the list of known hosts
+	hosts[request.Hostname] = nil
+	fmt.Println("Added host", request.Hostname)
 }
 
 func handleConnection(conn net.Conn) {
-func(w http.ResponseWriter, r *http.Request)
 	// Read the hostname from the client
 	hostname, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
@@ -50,8 +61,6 @@ func(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	hostname = strings.TrimSpace(hostname)
-	decoder := json.Decoder(conn)
-
 
 	// Add the host to the list of known hosts
 	hosts[hostname] = conn
@@ -81,38 +90,38 @@ func(w http.ResponseWriter, r *http.Request)
 				hostList += h + "\n"
 			}
 			conn.Write([]byte(hostList))
-		} else if strings.HasPrefix(data, "connect ") {
-			// Connect to another host
-			otherHost := strings.TrimPrefix(data, "connect ")
-			otherConn, ok := hosts[otherHost]
-			if !ok {
-				conn.Write([]byte("Error: Unknown host.\n"))
-				continue
+			} else if strings.HasPrefix(data, "connect ") {
+				// Connect to another host
+				otherHost := strings.TrimPrefix(data, "connect ")
+				otherConn, ok := hosts[otherHost]
+				if !ok {
+					conn.Write([]byte("Error: Unknown host.\n"))
+					continue
+				}
+	
+				fmt.Println("Connecting", hostname, "to", otherHost)
+	
+				// Copy data between the two connections
+				go func() {
+					_, err := io.Copy(conn, otherConn)
+					if err != nil {
+						log.Println(err)
+					}
+					conn.Close()
+					otherConn.Close()
+				}()
+				go func() {
+					_, err := io.Copy(otherConn, conn)
+					if err != nil {
+						log.Println(err)
+					}
+					conn.Close()
+					otherConn.Close()
+				}()
+			} else {
+				// Send an error message
+				conn.Write([]byte("Error: Unknown command.\n"))
 			}
-
-			fmt.Println("Connecting", hostname, "to", otherHost)
-			
-			// Copy data between the two connections
-			go func() {
-				_, err := io.Copy(conn, otherConn)
-				if err != nil {
-					log.Println(err)
-				}
-				conn.Close()
-				otherConn.Close()
-			}()
-			go func() {
-				_, err := io.Copy(otherConn, conn)
-				if err != nil {
-					log.Println(err)
-				}
-				conn.Close()
-				otherConn.Close()
-			}()
-		} else {
-			// Send an error message
-			conn.Write([]byte("Error: Unknown command.\n"))
 		}
 	}
-}
-				
+	
