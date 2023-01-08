@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
+    "net/http"
 	"strings"
+	"encoding/json"
 )
 
 var (
@@ -14,7 +15,7 @@ var (
 )
 
 func main() {
-	fmt.Println("Starting server")
+	fmt.Println("Starting server...")
 
 	// Create a map to hold the known hosts
 	hosts = make(map[string]net.Conn)
@@ -40,6 +41,7 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
+func(w http.ResponseWriter, r *http.Request)
 	// Read the hostname from the client
 	hostname, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
@@ -48,6 +50,8 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 	hostname = strings.TrimSpace(hostname)
+	decoder := json.Decoder(conn)
+
 
 	// Add the host to the list of known hosts
 	hosts[hostname] = conn
@@ -85,8 +89,9 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("Error: Unknown host.\n"))
 				continue
 			}
-			fmt.Println("Connecting", hostname, "to", otherHost)
 
+			fmt.Println("Connecting", hostname, "to", otherHost)
+			
 			// Copy data between the two connections
 			go func() {
 				_, err := io.Copy(conn, otherConn)
