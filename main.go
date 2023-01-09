@@ -16,6 +16,12 @@ var (
 	hosts map[string]net.Conn
 )
 
+var device struct {
+	hostname string
+	id 	 string
+	connection net.Conn
+}
+
 func main() {
 	fmt.Println("Starting server...")
 
